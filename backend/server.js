@@ -3,6 +3,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
+import cors from "cors";
 
 // Load env vars
 dotenv.config();
