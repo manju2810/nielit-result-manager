@@ -2,10 +2,20 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
+
+const dns = require("dns");
+=======
+
 const connectDB = require("./config/db");
 
 // Load env vars
 dotenv.config();
+
+
+// Fix DNS
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+=======
 
 // Connect to MongoDB
 connectDB();
@@ -17,6 +27,12 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
+// Routes
+app.use("/api/auth", require("./routes/authRoutes"));
+
+=======
 
 // Test route
 app.get("/", (req, res) => {
