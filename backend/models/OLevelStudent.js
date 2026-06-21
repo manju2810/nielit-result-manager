@@ -11,7 +11,10 @@ const subjectSchema = new mongoose.Schema({
   latest_subject_code: { type: String, default: null },
 });
 
+
 const oLevelStudentSchema = new mongoose.Schema(
+
+const oStudentSchema = new mongoose.Schema(
   {
     regn_no: {
       type: String,
@@ -29,19 +32,38 @@ const oLevelStudentSchema = new mongoose.Schema(
     batch_no: { type: String, trim: true, default: null },
     exam_app_no: { type: String, trim: true, default: null },
     subjects: {
+
       M1_R4:   { type: subjectSchema, default: () => ({}) },
       M2_R4:   { type: subjectSchema, default: () => ({}) },
       M3_R4:   { type: subjectSchema, default: () => ({}) },
+      M1_R4: { type: subjectSchema, default: () => ({}) },
+      M2_R4: { type: subjectSchema, default: () => ({}) },
+      M3_R4: { type: subjectSchema, default: () => ({}) },
+
       M4_3_R4: { type: subjectSchema, default: () => ({}) },
       Project: { type: subjectSchema, default: () => ({}) },
     },
     final_status: {
       type: String,
+
       enum: ["PASS", "FAIL", "RESULT PENDING", "ALL ABSENT", "NO SUBJECTS", null],
+
+      enum: [
+        "PASS",
+        "FAIL",
+        "RESULT PENDING",
+        "ALL ABSENT",
+        "NO SUBJECTS",
+        null,
+      ],
+
       default: null,
     },
   },
   { timestamps: true }
 );
 
+
 module.exports = mongoose.model("OLevelStudent", oLevelStudentSchema);
+=======
+module.exports = mongoose.model("OStudent", oStudentSchema);

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const dns = require("dns");
+
 const path = require("path");
 
 dotenv.config({ path: path.join(__dirname, "../.env") });
@@ -14,6 +15,21 @@ const seedAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("MongoDB Connected...");
 
+=======
+const User = require("../models/User");
+
+dotenv.config({ path: "../.env" });
+
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+const seedAdmin = async () => {
+  try {
+    // Connect to MongoDB
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Connected...");
+
+    // Check if admin already exists
+
     const existingAdmin = await User.findOne({ role: "admin" });
     if (existingAdmin) {
       console.log("Admin already exists!");
@@ -21,10 +37,18 @@ const seedAdmin = async () => {
       process.exit(0);
     }
 
+
     const admin = await User.create({
       name: "Admin",
       email: "admin@nielit.gov.in",
       password: process.env.ADMIN_PASSWORD,
+=======
+    // Create admin
+    const admin = await User.create({
+      name: "Admin",
+      email: "admin@nielit.gov.in",
+      password: "Admin@123",
+
       role: "admin",
       is_active: true,
       created_by: null,
@@ -35,11 +59,19 @@ const seedAdmin = async () => {
     console.log(`Email    : ${admin.email}`);
     console.log(`Password : Admin@123`);
     console.log(`Role     : ${admin.role}`);
+
     console.log("\n⚠️  Please change password after first login!");
 
     process.exit(0);
   } catch (error) {
     console.error("Error:", error.message);
+=======
+    console.log("\n⚠️  Please change the password after first login!");
+
+    process.exit(0);
+  } catch (error) {
+    console.error("Error creating admin:", error.message);
+
     process.exit(1);
   }
 };

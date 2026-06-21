@@ -3,6 +3,9 @@ const User = require("../models/User");
 
 const protect = async (req, res, next) => {
   try {
+
+    // Check token in header
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -12,8 +15,16 @@ const protect = async (req, res, next) => {
       });
     }
 
+
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Extract token
+    const token = authHeader.split(" ")[1];
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find user
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
@@ -29,6 +40,9 @@ const protect = async (req, res, next) => {
         message: "Your account has been deactivated",
       });
     }
+
+
+    // Attach user to request
 
     req.user = user;
     next();
