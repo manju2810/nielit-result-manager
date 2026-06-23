@@ -32,7 +32,7 @@ const oLevelStudentSchema = new mongoose.Schema(
       M1_R4: { type: subjectSchema, default: () => ({}) },
       M2_R4: { type: subjectSchema, default: () => ({}) },
       M3_R4: { type: subjectSchema, default: () => ({}) },
-      M4_3_R4: { type: subjectSchema, default: () => ({}) },
+      M4_R4: { type: subjectSchema, default: () => ({}) },
       Project: { type: subjectSchema, default: () => ({}) },
     },
     final_status: {
