@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui;
+  background-color: #F6F7F9;
+}
+
+/* Signature element: an ink-stamp style badge for result status.
+   Rotated slightly, double-ish border, uppercase + tracked type —
+   evokes a real mark-sheet being stamped, fitting a results system. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  border: 1.5px solid currentColor;
+  transform: rotate(-2deg);
+  background: transparent;
+  line-height: 1.4;
+}
+
+.stamp-pass { color: #15803D; }
+.stamp-fail { color: #B91C1C; }
+.stamp-absent { color: #B45309; }
+.stamp-pending { color: #475569; }

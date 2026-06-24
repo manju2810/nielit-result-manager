@@ -5,7 +5,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 // Pages
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
-import UploadPage from "./pages/UploadPage";
+import UploadChooserPage from "./pages/UploadChooserPage";
 import MasterPage from "./pages/MasterPage";
 import AdminPage from "./pages/AdminPage";
 import NotFound from "./pages/NotFound";
@@ -24,7 +24,7 @@ function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <UploadPage />
+                <UploadChooserPage />
               </ProtectedRoute>
             }
           />

@@ -7,26 +7,31 @@ const ALL_SUBJECT_KEYS = {
   A_LEVEL: ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "PR5"],
 };
 
+// Subjects that MUST all be passed for an overall PASS (Project/PR5 excluded)
+const CORE_SUBJECT_KEYS = {
+  O_LEVEL: ["M1_R4", "M2_R4", "M3_R4", "M4_R4"],
+  A_LEVEL: ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"],
+};
+
 function getModel(course) {
   return course === "A_LEVEL" ? ALevelStudent : OLevelStudent;
 }
 
 /**
- * Decide a student's overall status from their per-subject latest_status values,
- * considering only subjects the student is actually registered for.
+ * Shared rule for both courses: overall PASS only when ALL core subjects are PASS,
+ * regardless of registration flag (Project/PR5 is excluded entirely from this check).
+ *   - any core subject FAIL              -> FAIL
+ *   - all core subjects ABSENT           -> ALL ABSENT
+ *   - all core subjects PASS             -> PASS
+ *   - otherwise (missing/pending/mixed)  -> RESULT PENDING
  */
-function computeFinalStatus(subjectsObj, subjectKeys) {
-  const registeredKeys = subjectKeys.filter((k) => subjectsObj[k]?.registered);
-
-  if (registeredKeys.length === 0) return "NO SUBJECTS";
-
-  const statuses = registeredKeys.map((k) => subjectsObj[k].latest_status);
+function computeFinalStatus(course, subjectsObj) {
+  const coreKeys = CORE_SUBJECT_KEYS[course];
+  const statuses = coreKeys.map((k) => subjectsObj[k]?.latest_status || null);
 
   if (statuses.some((s) => s === "FAIL")) return "FAIL";
   if (statuses.every((s) => s === "ABSENT")) return "ALL ABSENT";
-  if (statuses.some((s) => s === null || s === "RESULT PENDING")) return "RESULT PENDING";
   if (statuses.every((s) => s === "PASS")) return "PASS";
-
   return "RESULT PENDING";
 }
 
@@ -109,7 +114,7 @@ async function mergeCourseData(course, ynMap, resultMap, examCycle) {
       }
     }
 
-    student.final_status = computeFinalStatus(student.subjects, subjectKeys);
+    student.final_status = computeFinalStatus(course, student.subjects);
 
     await student.save();
     if (isNew) created += 1;
