@@ -42,6 +42,10 @@ const resultHistorySchema = new mongoose.Schema(
       enum: ["PASS", "FAIL", "ABSENT"],
       required: true,
     },
+    is_best: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

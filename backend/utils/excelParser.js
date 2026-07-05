@@ -5,6 +5,7 @@ const {
   O_LEVEL_YN_HEADER_TO_KEY,
   A_LEVEL_YN_HEADERS,
 } = require("./subjectMap");
+const { parseHtmlTable, looksLikeHtml } = require("./htmlTableParser");
 
 // Matches "M1-R5.1 ( B )", "A9.2-R5.1 ( ABS )", and also "PR5 ( B )" (no paper-version segment)
 const RESULT_REGEX = /^([A-Za-z0-9.]+)\s*(?:-\s*([^()]+?))?\s*\(\s*([^)]+?)\s*\)\s*$/;
@@ -24,11 +25,29 @@ function gradeToStatus(grade) {
   return "PASS";
 }
 
+// Strips punctuation/spacing so "Regn_No", "Regn.No.", "Regn No" all match the same key
+function normalizeHeader(h) {
+  return String(h || "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}
+
+function normalizeRow(row) {
+  const norm = {};
+  for (const [k, v] of Object.entries(row)) {
+    norm[normalizeHeader(k)] = v;
+  }
+  return norm;
+}
+
 /**
- * Read the first worksheet of a workbook buffer into an array of row-objects
- * keyed by the header row (row 1).
+ * Read tabular data from a buffer into an array of row-objects keyed by header text.
+ * Auto-detects format: real .xlsx spreadsheet, or an HTML table saved with a
+ * .xls/.xlsx extension (a format the NIELIT portal sometimes exports).
  */
 async function readSheetAsObjects(buffer) {
+  if (looksLikeHtml(buffer)) {
+    return parseHtmlTable(buffer);
+  }
+
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const sheet = workbook.worksheets[0];
@@ -47,6 +66,7 @@ async function readSheetAsObjects(buffer) {
       const key = headers[colNumber];
       if (key) obj[key] = cell.value;
     });
+    // Skip fully blank rows
     const hasAnyValue = Object.values(obj).some(
       (v) => v !== null && v !== undefined && String(v).trim() !== ""
     );
@@ -69,7 +89,7 @@ async function parseYNFile(buffer, course) {
 
   for (const row of rows) {
     const regn_no = cleanStr(row.Regn_No);
-    if (!regn_no) continue;
+    if (!regn_no) continue; // students with no Regn_No (e.g. "Not Applied"/"Dropout") can't be tracked per-student
 
     const registered = {};
     for (const header of subjectHeaders) {
@@ -97,6 +117,8 @@ async function parseYNFile(buffer, course) {
 
 /**
  * Parse a Result file (one row per subject result).
+ * Returns: Map<regn_no, { regn_no, roll_no, name, father_name, category,
+ *                          subjects: [{ key, raw_code, grade, status }] }>
  */
 async function parseResultFile(buffer, course) {
   const rows = await readSheetAsObjects(buffer);
@@ -104,8 +126,9 @@ async function parseResultFile(buffer, course) {
   const skipped = [];
 
   for (const row of rows) {
-    const regn_no = cleanStr(row.Regn_No);
-    const resultStr = cleanStr(row.Result);
+    const norm = normalizeRow(row);
+    const regn_no = cleanStr(norm.regnno);
+    const resultStr = cleanStr(norm.result);
     if (!regn_no || !resultStr) continue;
 
     const match = resultStr.match(RESULT_REGEX);
@@ -126,9 +149,10 @@ async function parseResultFile(buffer, course) {
     if (!result.has(regn_no)) {
       result.set(regn_no, {
         regn_no,
-        roll_no: cleanStr(row.Roll_No),
-        name: cleanStr(row.Candidate_Name),
-        father_name: cleanStr(row.Fathers_Name),
+        roll_no: cleanStr(norm.rollno),
+        name: cleanStr(norm.candidatename),
+        father_name: cleanStr(norm.fathersname),
+        category: cleanStr(norm.category),
         subjects: [],
       });
     }
@@ -138,4 +162,40 @@ async function parseResultFile(buffer, course) {
   return { data: result, skipped };
 }
 
-module.exports = { parseYNFile, parseResultFile, gradeToStatus };
+/**
+ * Parse a Student Registration (enrollment) file — one row per student,
+ * one-time demographic/enrollment info (not tied to a specific exam cycle).
+ * Returns: Map<regn_no, { regn_no, name, father_name, mother_name, dob,
+ *                          enrollment_app_no, batch, expiry_date,
+ *                          address, city, state, pincode, level }>
+ */
+async function parseStudentRegistrationFile(buffer) {
+  const rows = await readSheetAsObjects(buffer);
+  const result = new Map();
+
+  for (const row of rows) {
+    const norm = normalizeRow(row);
+    const regn_no = cleanStr(norm.regnno);
+    if (!regn_no) continue;
+
+    result.set(regn_no, {
+      regn_no,
+      name: cleanStr(norm.name),
+      father_name: cleanStr(norm.fatherguardianname),
+      mother_name: cleanStr(norm.mothername),
+      dob: cleanStr(norm.dateofbirth),
+      enrollment_app_no: cleanStr(norm.appno),
+      batch: cleanStr(norm.commencedfrom),
+      expiry_date: cleanStr(norm.expirydate),
+      address: cleanStr(norm.address),
+      city: cleanStr(norm.city),
+      state: cleanStr(norm.state),
+      pincode: cleanStr(norm.pincode),
+      level: cleanStr(norm.level),
+    });
+  }
+
+  return result;
+}
+
+module.exports = { parseYNFile, parseResultFile, parseStudentRegistrationFile, gradeToStatus };

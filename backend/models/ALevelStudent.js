@@ -26,8 +26,18 @@ const aLevelStudentSchema = new mongoose.Schema(
       trim: true,
     },
     father_name: { type: String, trim: true, default: null },
-    batch_no: { type: String, trim: true, default: null },
+    mother_name: { type: String, trim: true, default: null },
+    dob: { type: String, trim: true, default: null },
+    category: { type: String, trim: true, default: null },
+    batch_no: { type: String, trim: true, default: null }, // institute batch code, e.g. "DIO-149" (from Exam Registration file)
+    enrollment_batch: { type: String, trim: true, default: null }, // enrollment cohort, e.g. "Jan-2023" (from Student Registration file)
+    enrollment_app_no: { type: String, trim: true, default: null },
     exam_app_no: { type: String, trim: true, default: null },
+    expiry_date: { type: String, trim: true, default: null },
+    address: { type: String, trim: true, default: null },
+    city: { type: String, trim: true, default: null },
+    state: { type: String, trim: true, default: null },
+    pincode: { type: String, trim: true, default: null },
     subjects: {
       A1:  { type: subjectSchema, default: () => ({}) },
       A2:  { type: subjectSchema, default: () => ({}) },
