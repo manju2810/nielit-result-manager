@@ -19,10 +19,8 @@ const upload = multer({
 
 const uploadExcelFiles = upload.fields([
   { name: "o_student_reg", maxCount: 1 },
-  { name: "o_yn", maxCount: 1 },
   { name: "o_result", maxCount: 1 },
   { name: "a_student_reg", maxCount: 1 },
-  { name: "a_yn", maxCount: 1 },
   { name: "a_result", maxCount: 1 },
 ]);
 

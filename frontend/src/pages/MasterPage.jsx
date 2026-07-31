@@ -60,8 +60,7 @@ const StudentDetailModal = ({ regnNo, course, onClose }) => {
               <p><span className="text-gray-400">Mother's Name:</span> {data.student.mother_name || "—"}</p>
               <p><span className="text-gray-400">DOB:</span> {data.student.dob || "—"}</p>
               <p><span className="text-gray-400">Category:</span> {data.student.category || "—"}</p>
-              <p><span className="text-gray-400">Institute Batch:</span> {data.student.batch_no || "—"}</p>
-              <p><span className="text-gray-400">Enrollment Batch:</span> {data.student.enrollment_batch || "—"}</p>
+              <p><span className="text-gray-400">Batch:</span> {data.student.enrollment_batch || data.student.batch_no || "—"}</p>
               <p><span className="text-gray-400">City/State:</span> {[data.student.city, data.student.state].filter(Boolean).join(", ") || "—"}</p>
               <p><span className="text-gray-400">Expiry:</span> {data.student.expiry_date || "—"}</p>
               <p className="col-span-2"><span className="text-gray-400">Final Status:</span> <StatusBadge status={data.student.final_status} /></p>
@@ -144,7 +143,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex flex-col">
-      {/* Header bar */}
       <div className="bg-gray-900 text-white px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-green-400 font-mono text-lg">⊞</span>
@@ -163,7 +161,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
         </button>
       </div>
 
-      {/* Legend */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-2 flex items-center gap-6 text-xs flex-shrink-0">
         <span className="text-gray-400 font-medium">Legend:</span>
         <span><span className="text-gray-400 font-mono font-bold">NR</span> <span className="text-gray-500">= Not Registered</span></span>
@@ -173,7 +170,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
         <span><span className="text-gray-400 font-mono">Pending</span> <span className="text-gray-500">= Registered, result not uploaded yet</span></span>
       </div>
 
-      {/* Spreadsheet table */}
       <div className="overflow-auto flex-1 bg-white">
         {loading ? (
           <div className="flex items-center justify-center h-full text-gray-400">Loading...</div>
@@ -209,7 +205,7 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
                   <td className="border border-gray-200 px-4 py-2 font-mono text-gray-700 whitespace-nowrap">{s.regn_no}</td>
                   <td className="border border-gray-200 px-4 py-2 font-medium whitespace-nowrap">{s.name}</td>
                   <td className="border border-gray-200 px-4 py-2 text-gray-600 whitespace-nowrap">{s.father_name || "—"}</td>
-                  <td className="border border-gray-200 px-4 py-2 text-gray-600 whitespace-nowrap">{s.batch_no || s.enrollment_batch || "—"}</td>
+                  <td className="border border-gray-200 px-4 py-2 text-gray-600 whitespace-nowrap">{s.enrollment_batch || s.batch_no || "—"}</td>
                   {subjectKeys.map((k) => {
                     const subj = s.subjects?.[k];
                     const grade = subj?.latest_grade;
@@ -250,7 +246,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
         )}
       </div>
 
-      {/* Footer */}
       <div className="bg-gray-800 text-gray-400 text-xs px-6 py-2 flex-shrink-0">
         Showing up to 200 students · Use filters on the main page to narrow down results
       </div>
@@ -387,21 +382,19 @@ const MasterPage = () => {
                   <th className="px-4 py-3 text-left">Roll No</th>
                   <th className="px-4 py-3 text-left">Name</th>
                   <th className="px-4 py-3 text-left">Batch</th>
-                  <th className="px-4 py-3 text-left">Enrollment</th>
                   <th className="px-4 py-3 text-left">Final Status</th>
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
-                {!loading && students.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No students found</td></tr>}
+                {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
+                {!loading && students.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No students found</td></tr>}
                 {!loading && students.map((s) => (
                   <tr key={s._id} onClick={() => setSelected(s.regn_no)}
                     className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer">
                     <td className="px-4 py-3 font-mono text-gray-700">{s.regn_no}</td>
                     <td className="px-4 py-3">{s.roll_no || "—"}</td>
                     <td className="px-4 py-3 font-medium">{s.name}</td>
-                    <td className="px-4 py-3">{s.batch_no || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.enrollment_batch || "—"}</td>
+                    <td className="px-4 py-3">{s.enrollment_batch || s.batch_no || "—"}</td>
                     <td className="px-4 py-3"><StatusBadge status={s.final_status} /></td>
                   </tr>
                 ))}

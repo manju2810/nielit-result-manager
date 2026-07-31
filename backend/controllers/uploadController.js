@@ -1,38 +1,138 @@
 const ExamCycle = require("../models/ExamCycle");
 const ActivityLog = require("../models/ActivityLog");
-const { parseYNFile, parseResultFile, parseStudentRegistrationFile } = require("../utils/excelParser");
+const ResultHistory = require("../models/ResultHistory");
+const ALevelStudent = require("../models/ALevelStudent");
+const OLevelStudent = require("../models/OLevelStudent");
+const { parseResultFile, parseStudentRegistrationFile } = require("../utils/excelParser");
 const { mergeCourseData, mergeStudentRegistrationData } = require("../services/resultMergeService");
+
+const CORE_SUBJECT_KEYS = {
+  O_LEVEL: ["M1_R4", "M2_R4", "M3_R4", "M4_R4"],
+  A_LEVEL: ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"],
+};
+
+function getModel(course) {
+  return course === "A_LEVEL" ? ALevelStudent : OLevelStudent;
+}
+
+function computeFinalStatus(course, subjectsObj) {
+  const coreKeys = CORE_SUBJECT_KEYS[course];
+  const statuses = coreKeys.map((k) => subjectsObj[k]?.latest_status || null);
+  if (statuses.some((s) => s === "FAIL")) return "FAIL";
+  if (statuses.every((s) => s === "ABSENT")) return "ALL ABSENT";
+  if (statuses.every((s) => s === "PASS")) return "PASS";
+  return "RESULT PENDING";
+}
+
+const deleteExamCycle = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const examCycle = await ExamCycle.findById(id);
+    if (!examCycle) {
+      return res.status(404).json({ success: false, message: "Exam cycle not found" });
+    }
+
+    const course = examCycle.course;
+    const Model = getModel(course);
+
+    const cycleHistories = await ResultHistory.find({ exam_cycle_id: id });
+
+    const studentMap = {};
+    for (const h of cycleHistories) {
+      if (!studentMap[h.regn_no]) studentMap[h.regn_no] = [];
+      studentMap[h.regn_no].push(h.subject_key);
+    }
+
+    await ResultHistory.deleteMany({ exam_cycle_id: id });
+
+    for (const [regn_no, subjectKeys] of Object.entries(studentMap)) {
+      const student = await Model.findOne({ regn_no });
+      if (!student) continue;
+
+      for (const subjectKey of [...new Set(subjectKeys)]) {
+        const remaining = await ResultHistory.find({
+          regn_no,
+          course,
+          subject_key: subjectKey,
+        }).sort({ createdAt: -1 });
+
+        if (remaining.length === 0) {
+          student.subjects[subjectKey].latest_grade = null;
+          student.subjects[subjectKey].latest_status = null;
+          student.subjects[subjectKey].latest_subject_code = null;
+          student.subjects[subjectKey].registered = false;
+        } else {
+          const GRADE_RANK = { A: 5, B: 4, C: 3, D: 2, F: 1, ABS: 0 };
+          const best = remaining.reduce((prev, curr) => {
+            const prevRank = GRADE_RANK[(prev.grade || "").toUpperCase()] ?? -1;
+            const currRank = GRADE_RANK[(curr.grade || "").toUpperCase()] ?? -1;
+            return currRank > prevRank ? curr : prev;
+          });
+
+          await ResultHistory.updateMany(
+            { regn_no, course, subject_key: subjectKey },
+            { $set: { is_best: false } }
+          );
+          await ResultHistory.findByIdAndUpdate(best._id, { $set: { is_best: true } });
+
+          student.subjects[subjectKey].latest_grade = best.grade;
+          student.subjects[subjectKey].latest_status = best.status;
+          student.subjects[subjectKey].latest_subject_code = best.subject_code;
+          student.subjects[subjectKey].registered = true;
+        }
+      }
+
+      student.final_status = computeFinalStatus(course, student.subjects);
+      await student.save();
+    }
+
+    await ExamCycle.findByIdAndDelete(id);
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      user_name: req.user.name,
+      user_email: req.user.email,
+      role: req.user.role,
+      action: "DELETE",
+      course,
+      details: `Deleted exam cycle "${examCycle.cycle_name}" and rolled back ${Object.keys(studentMap).length} students' grades`,
+      ip_address: req.ip,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Exam cycle "${examCycle.cycle_name}" deleted and ${Object.keys(studentMap).length} students' grades rolled back successfully`,
+      affectedStudents: Object.keys(studentMap).length,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 async function processOneCourse(course, files, cycleNameInput, userId) {
   const studentRegKey = course === "A_LEVEL" ? "a_student_reg" : "o_student_reg";
-  const ynKey = course === "A_LEVEL" ? "a_yn" : "o_yn";
   const resultKey = course === "A_LEVEL" ? "a_result" : "o_result";
 
   const studentRegFile = files?.[studentRegKey]?.[0];
-  const ynFile = files?.[ynKey]?.[0];
   const resultFile = files?.[resultKey]?.[0];
 
-  if (!studentRegFile && !ynFile && !resultFile) return null; // nothing uploaded for this course
+  if (!studentRegFile && !resultFile) return null;
 
+  // Process student registration file independently
   let studentRegSummary = null;
   if (studentRegFile) {
     const regMap = await parseStudentRegistrationFile(studentRegFile.buffer);
     studentRegSummary = await mergeStudentRegistrationData(course, regMap);
   }
 
+  // Process result file
   let cycleSummary = null;
-  if (ynFile || resultFile) {
-    const ynMap = ynFile ? await parseYNFile(ynFile.buffer, course) : null;
-    const { data: resultMap, skipped } = resultFile
-      ? await parseResultFile(resultFile.buffer, course)
-      : { data: null, skipped: [] };
+  if (resultFile) {
+    const { data: resultMap, skipped } = await parseResultFile(resultFile.buffer, course);
 
-    // Determine cycle name: prefer explicit input, else from YN file's Month_year_Level column
+    // Cycle name from input or auto-generate
     let cycleName = cycleNameInput;
-    if (!cycleName && ynMap) {
-      const firstRow = ynMap.values().next().value;
-      cycleName = firstRow?.cycle_name || null;
-    }
     if (!cycleName) cycleName = `${course}_${new Date().toISOString().slice(0, 10)}`;
 
     const examCycle = await ExamCycle.create({
@@ -43,7 +143,8 @@ async function processOneCourse(course, files, cycleNameInput, userId) {
       status: "pending",
     });
 
-    const summary = await mergeCourseData(course, ynMap, resultMap, examCycle);
+    // Pass null for ynMap since we no longer use YN file
+    const summary = await mergeCourseData(course, null, resultMap, examCycle);
 
     examCycle.status = "processed";
     await examCycle.save();
@@ -64,19 +165,12 @@ async function processOneCourse(course, files, cycleNameInput, userId) {
   };
 }
 
-// @desc   Upload Student Registration / Exam Registration (YN) / Result excel files
-//         for O-Level and/or A-Level, process and merge into DB
-// @route  POST /api/results/upload
-// @access Protected (admin or user)
 const uploadResults = async (req, res) => {
   try {
     const files = req.files || {};
     const { cycle_name } = req.body;
 
-    const anyFileKeys = [
-      "o_student_reg", "o_yn", "o_result",
-      "a_student_reg", "a_yn", "a_result",
-    ];
+    const anyFileKeys = ["o_student_reg", "o_result", "a_student_reg", "a_result"];
     const hasAnyFile = anyFileKeys.some((k) => files[k]?.[0]);
     if (!hasAnyFile) {
       return res.status(400).json({
@@ -106,7 +200,7 @@ const uploadResults = async (req, res) => {
             parts.push(`Student Reg (${r.studentRegistration.created} new, ${r.studentRegistration.updated} updated)`);
           }
           if (r.historyRows !== undefined) {
-            parts.push(`Exam Cycle (${r.created} new, ${r.updated} updated, ${r.historyRows} subject results, ${r.improvedSubjects || 0} grade improvements)`);
+            parts.push(`Result (${r.created} new, ${r.updated} updated, ${r.historyRows} subject results)`);
           }
           return `${r.course}: ${parts.join(", ")}`;
         })
@@ -124,4 +218,4 @@ const uploadResults = async (req, res) => {
   }
 };
 
-module.exports = { uploadResults };
+module.exports = { uploadResults, deleteExamCycle };

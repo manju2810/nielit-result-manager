@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Navbar from "../components/Navbar";
 import StudentRegUpload from "../components/uploads/StudentRegUpload";
-import ExamRegUpload from "../components/uploads/ExamRegUpload";
 import ResultUpload from "../components/uploads/ResultUpload";
 
 const cards = [
@@ -14,16 +13,6 @@ const cards = [
     description: "Upload when new students enroll. Contains Name, DOB, Address, Batch info.",
     buttonLabel: "Upload Student Registration",
     buttonColor: "bg-purple-600 hover:bg-purple-700",
-  },
-  {
-    id: "exam_reg",
-    icon: "📋",
-    title: "Exam Registration",
-    badge: "Per Cycle",
-    badgeColor: "bg-blue-100 text-blue-700",
-    description: "Upload every Jan/July cycle. Contains which subjects each student registered for.",
-    buttonLabel: "Upload Exam Registration",
-    buttonColor: "bg-blue-600 hover:bg-blue-700",
   },
   {
     id: "result",
@@ -67,8 +56,8 @@ const UploadChooserPage = () => {
             </span>
           </div>
 
-          {/* 3 Cards */}
-          <div className="grid sm:grid-cols-3 gap-6 mb-10">
+          {/* 2 Cards */}
+          <div className="grid sm:grid-cols-2 gap-6 mb-10">
             {cards.map((card) => (
               <div
                 key={card.id}
@@ -96,7 +85,7 @@ const UploadChooserPage = () => {
             ))}
           </div>
 
-          {/* Upload section — shown below cards when active */}
+          {/* Upload sections */}
           {active === "student_reg" && (
             <div className="bg-white rounded-2xl shadow-md p-6">
               <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -104,15 +93,6 @@ const UploadChooserPage = () => {
                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">One-time</span>
               </h2>
               <StudentRegUpload course={course} />
-            </div>
-          )}
-          {active === "exam_reg" && (
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                📋 Upload Exam Registration (YN)
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Per Cycle</span>
-              </h2>
-              <ExamRegUpload course={course} />
             </div>
           )}
           {active === "result" && (
