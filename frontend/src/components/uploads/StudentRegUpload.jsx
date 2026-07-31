@@ -1,9 +1,15 @@
 import { useState } from "react";
 import API from "../../api/axios";
 
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const currentYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 8 }, (_, i) => currentYear + 1 - i);
+
 const StudentRegUpload = ({ course }) => {
   const fieldName = course === "A_LEVEL" ? "a_student_reg" : "o_student_reg";
   const [file, setFile] = useState(null);
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -13,6 +19,7 @@ const StudentRegUpload = ({ course }) => {
     if (!file) { setError("Please select a file."); return; }
     setError(""); setResult(null);
     const formData = new FormData();
+    if (month && year) formData.append("cycle_name", `${month} ${year}`);
     formData.append(fieldName, file);
     setLoading(true);
     try {
@@ -34,6 +41,23 @@ const StudentRegUpload = ({ course }) => {
       {error && (
         <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>
       )}
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">
+          Exam Session <span className="text-gray-400 font-normal"></span>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <select value={month} onChange={(e) => setMonth(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="">Select Month</option>
+            {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <select value={year} onChange={(e) => setYear(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <option value="">Select Year</option>
+            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
       {!file ? (
         <input
           type="file" accept=".xlsx,.xls"

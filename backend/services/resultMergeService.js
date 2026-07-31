@@ -34,11 +34,15 @@ function computeFinalStatus(course, subjectsObj) {
 
 /**
  * Merge a Student Registration (enrollment) file into the database.
+ * Tracks which regn_nos were newly created vs. updated, so the batch
+ * can later be identified and (partially) rolled back.
  */
 async function mergeStudentRegistrationData(course, regMap) {
   const Model = getModel(course);
   let created = 0;
   let updated = 0;
+  const created_regn_nos = [];
+  const updated_regn_nos = [];
 
   for (const [regn_no, row] of regMap.entries()) {
     let student = await Model.findOne({ regn_no });
@@ -61,11 +65,22 @@ async function mergeStudentRegistrationData(course, regMap) {
     if (row.pincode) student.pincode = row.pincode;
 
     await student.save();
-    if (isNew) created += 1;
-    else updated += 1;
+    if (isNew) {
+      created += 1;
+      created_regn_nos.push(regn_no);
+    } else {
+      updated += 1;
+      updated_regn_nos.push(regn_no);
+    }
   }
 
-  return { created, updated, totalStudents: regMap.size };
+  return {
+    created,
+    updated,
+    totalStudents: regMap.size,
+    created_regn_nos,
+    updated_regn_nos,
+  };
 }
 
 /**

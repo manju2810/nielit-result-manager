@@ -9,12 +9,12 @@ function getModel(course) {
   return course === "A_LEVEL" ? ALevelStudent : OLevelStudent;
 }
 
-// @desc   List/search students for a course, sorted by regn_no, optionally filtered by batch
-// @route  GET /api/results/students?course=O_LEVEL&search=&batch=&page=&limit=
+// @desc   List/search students for a course, sorted by regn_no
+// @route  GET /api/results/students?course=O_LEVEL&search=&page=&limit=
 // @access Protected
 const listStudents = async (req, res) => {
   try {
-    const { course = "O_LEVEL", search = "", batch = "", page = 1, limit = 50 } = req.query;
+    const { course = "O_LEVEL", search = "", page = 1, limit = 50 } = req.query;
     if (!["O_LEVEL", "A_LEVEL"].includes(course)) {
       return res.status(400).json({ success: false, message: "Invalid course" });
     }
@@ -23,13 +23,7 @@ const listStudents = async (req, res) => {
     const filter = {};
     if (search.trim()) {
       const re = new RegExp(search.trim(), "i");
-      filter.$or = [{ regn_no: re }, { name: re }, { roll_no: re }, { batch_no: re }];
-    }
-    if (batch.trim()) {
-      filter.$and = [
-        ...(filter.$and || []),
-        { $or: [{ batch_no: batch.trim() }, { enrollment_batch: batch.trim() }] },
-      ];
+      filter.$or = [{ regn_no: re }, { name: re }, { roll_no: re }];
     }
 
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
@@ -44,29 +38,6 @@ const listStudents = async (req, res) => {
     ]);
 
     res.status(200).json({ success: true, total, page: pageNum, limit: limitNum, students });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc   List distinct batches for a course
-// @route  GET /api/results/batches?course=O_LEVEL
-// @access Protected
-const listBatches = async (req, res) => {
-  try {
-    const { course = "O_LEVEL" } = req.query;
-    if (!["O_LEVEL", "A_LEVEL"].includes(course)) {
-      return res.status(400).json({ success: false, message: "Invalid course" });
-    }
-    const Model = getModel(course);
-
-    const [batchNos, enrollmentBatches] = await Promise.all([
-      Model.distinct("batch_no"),
-      Model.distinct("enrollment_batch"),
-    ]);
-
-    const batches = [...new Set([...batchNos, ...enrollmentBatches].filter(Boolean))].sort();
-    res.status(200).json({ success: true, batches });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -109,11 +80,11 @@ const getStudent = async (req, res) => {
 };
 
 // @desc   Export students to Excel
-// @route  GET /api/results/export?course=O_LEVEL&batch=&search=
+// @route  GET /api/results/export?course=O_LEVEL&search=
 // @access Protected
 const exportStudents = async (req, res) => {
   try {
-    const { course = "O_LEVEL", search = "", batch = "" } = req.query;
+    const { course = "O_LEVEL", search = "" } = req.query;
     if (!["O_LEVEL", "A_LEVEL"].includes(course)) {
       return res.status(400).json({ success: false, message: "Invalid course" });
     }
@@ -122,13 +93,7 @@ const exportStudents = async (req, res) => {
     const filter = {};
     if (search.trim()) {
       const re = new RegExp(search.trim(), "i");
-      filter.$or = [{ regn_no: re }, { name: re }, { roll_no: re }, { batch_no: re }];
-    }
-    if (batch.trim()) {
-      filter.$and = [
-        ...(filter.$and || []),
-        { $or: [{ batch_no: batch.trim() }, { enrollment_batch: batch.trim() }] },
-      ];
+      filter.$or = [{ regn_no: re }, { name: re }, { roll_no: re }];
     }
 
     const students = await Model.find(filter).sort({ regn_no: 1 });
@@ -146,7 +111,6 @@ const exportStudents = async (req, res) => {
       "Regn No",
       "Name",
       "Father Name",
-      "Batch",
       ...subjectKeys,
       "Final Status",
     ]);
@@ -167,7 +131,6 @@ const exportStudents = async (req, res) => {
         s.regn_no,
         s.name,
         s.father_name || "",
-        s.batch_no || s.enrollment_batch || "",
         ...subjectKeys.map((k) => {
           const subj = s.subjects?.[k];
           if (!subj || !subj.registered) return "Not Registered";
@@ -179,7 +142,7 @@ const exportStudents = async (req, res) => {
     }
 
     // Color code Final Status column
-    const statusColIndex = 5 + subjectKeys.length;
+    const statusColIndex = 4 + subjectKeys.length;
     sheet.getColumn(statusColIndex).eachCell({ includeEmpty: false }, (cell, rowNumber) => {
       if (rowNumber === 1) return;
       const val = cell.value;
@@ -209,7 +172,7 @@ const exportStudents = async (req, res) => {
       role: req.user.role,
       action: "DOWNLOAD",
       course,
-      details: `Exported ${students.length} students to Excel (batch: ${batch || "all"}, search: ${search || "none"})`,
+      details: `Exported ${students.length} students to Excel (search: ${search || "none"})`,
       ip_address: req.ip,
     });
 
@@ -244,4 +207,4 @@ const listCycles = async (req, res) => {
   }
 };
 
-module.exports = { listStudents, listBatches, getStudent, exportStudents, listCycles };
+module.exports = { listStudents, getStudent, exportStudents, listCycles };

@@ -43,7 +43,7 @@ const ResultUpload = ({ course }) => {
       )}
       <div>
         <label className="block text-xs font-medium text-gray-600 mb-1">
-          Exam Session <span className="text-gray-400 font-normal">(optional — auto-detected if blank)</span>
+          Exam Session <span className="text-gray-400 font-normal"></span>
         </label>
         <div className="grid grid-cols-2 gap-3">
           <select value={month} onChange={(e) => setMonth(e.target.value)}

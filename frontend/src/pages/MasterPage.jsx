@@ -60,7 +60,6 @@ const StudentDetailModal = ({ regnNo, course, onClose }) => {
               <p><span className="text-gray-400">Mother's Name:</span> {data.student.mother_name || "—"}</p>
               <p><span className="text-gray-400">DOB:</span> {data.student.dob || "—"}</p>
               <p><span className="text-gray-400">Category:</span> {data.student.category || "—"}</p>
-              <p><span className="text-gray-400">Batch:</span> {data.student.enrollment_batch || data.student.batch_no || "—"}</p>
               <p><span className="text-gray-400">City/State:</span> {[data.student.city, data.student.state].filter(Boolean).join(", ") || "—"}</p>
               <p><span className="text-gray-400">Expiry:</span> {data.student.expiry_date || "—"}</p>
               <p className="col-span-2"><span className="text-gray-400">Final Status:</span> <StatusBadge status={data.student.final_status} /></p>
@@ -129,17 +128,17 @@ const StudentDetailModal = ({ regnNo, course, onClose }) => {
   );
 };
 
-const SpreadsheetView = ({ course, search, batch, onClose }) => {
+const SpreadsheetView = ({ course, search, onClose }) => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const subjectKeys = SUBJECT_KEYS[course];
 
   useEffect(() => {
     setLoading(true);
-    API.get("/results/students", { params: { course, search, batch, limit: 200, page: 1 } })
+    API.get("/results/students", { params: { course, search, limit: 200, page: 1 } })
       .then((res) => setStudents(res.data.students))
       .finally(() => setLoading(false));
-  }, [course, search, batch]);
+  }, [course, search]);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex flex-col">
@@ -148,7 +147,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
           <span className="text-green-400 font-mono text-lg">⊞</span>
           <span className="font-semibold">
             {course.replace("_", " ")} — Spreadsheet View
-            {batch && <span className="text-gray-400 ml-2 text-sm">Batch: {batch}</span>}
             {search && <span className="text-gray-400 ml-2 text-sm">Search: "{search}"</span>}
           </span>
           <span className="text-gray-400 text-sm ml-4">{students.length} students</span>
@@ -181,7 +179,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
                 <th className="border border-gray-600 px-4 py-2.5 text-left font-semibold whitespace-nowrap min-w-[120px]">Regn No</th>
                 <th className="border border-gray-600 px-4 py-2.5 text-left font-semibold whitespace-nowrap min-w-[160px]">Name</th>
                 <th className="border border-gray-600 px-4 py-2.5 text-left font-semibold whitespace-nowrap min-w-[160px]">Father Name</th>
-                <th className="border border-gray-600 px-4 py-2.5 text-left font-semibold whitespace-nowrap min-w-[100px]">Batch</th>
                 {subjectKeys.map((k) => (
                   <th key={k} className="border border-gray-600 px-4 py-2.5 text-center font-semibold whitespace-nowrap min-w-[90px]">{k}</th>
                 ))}
@@ -191,7 +188,7 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
             <tbody>
               {students.length === 0 && (
                 <tr>
-                  <td colSpan={6 + subjectKeys.length} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={5 + subjectKeys.length} className="px-4 py-8 text-center text-gray-400">
                     No students found
                   </td>
                 </tr>
@@ -205,7 +202,6 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
                   <td className="border border-gray-200 px-4 py-2 font-mono text-gray-700 whitespace-nowrap">{s.regn_no}</td>
                   <td className="border border-gray-200 px-4 py-2 font-medium whitespace-nowrap">{s.name}</td>
                   <td className="border border-gray-200 px-4 py-2 text-gray-600 whitespace-nowrap">{s.father_name || "—"}</td>
-                  <td className="border border-gray-200 px-4 py-2 text-gray-600 whitespace-nowrap">{s.enrollment_batch || s.batch_no || "—"}</td>
                   {subjectKeys.map((k) => {
                     const subj = s.subjects?.[k];
                     const grade = subj?.latest_grade;
@@ -256,8 +252,7 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
 const MasterPage = () => {
   const [course, setCourse] = useState("O_LEVEL");
   const [search, setSearch] = useState("");
-  
-  
+
   const [students, setStudents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -268,12 +263,10 @@ const MasterPage = () => {
   const [showSpreadsheet, setShowSpreadsheet] = useState(false);
   const limit = 25;
 
-
-
   const fetchStudents = useCallback(() => {
     setLoading(true);
     setError("");
-    API.get("/results/students", { params: { course, search,  page, limit } })
+    API.get("/results/students", { params: { course, search, page, limit } })
       .then((res) => { setStudents(res.data.students); setTotal(res.data.total); })
       .catch((err) => setError(err.response?.data?.message || "Failed to load students"))
       .finally(() => setLoading(false));
@@ -288,7 +281,6 @@ const MasterPage = () => {
     setExporting(true);
     try {
       const params = new URLSearchParams({ course });
-     
       if (search) params.append("search", search);
       const res = await API.get(`/results/export?${params.toString()}`, {
         responseType: "blob",
@@ -346,8 +338,6 @@ const MasterPage = () => {
               </select>
             </div>
 
-           
-
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-medium text-gray-600 mb-1">Search (Regn No / Name / Roll No)</label>
               <input
@@ -369,20 +359,18 @@ const MasterPage = () => {
                   <th className="px-4 py-3 text-left">Regn No</th>
                   <th className="px-4 py-3 text-left">Roll No</th>
                   <th className="px-4 py-3 text-left">Name</th>
-                  <th className="px-4 py-3 text-left">Batch</th>
                   <th className="px-4 py-3 text-left">Final Status</th>
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
-                {!loading && students.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No students found</td></tr>}
+                {loading && <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
+                {!loading && students.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-400">No students found</td></tr>}
                 {!loading && students.map((s) => (
                   <tr key={s._id} onClick={() => setSelected(s.regn_no)}
                     className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer">
                     <td className="px-4 py-3 font-mono text-gray-700">{s.regn_no}</td>
                     <td className="px-4 py-3">{s.roll_no || "—"}</td>
                     <td className="px-4 py-3 font-medium">{s.name}</td>
-                    <td className="px-4 py-3">{s.enrollment_batch || s.batch_no || "—"}</td>
                     <td className="px-4 py-3"><StatusBadge status={s.final_status} /></td>
                   </tr>
                 ))}

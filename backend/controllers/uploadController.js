@@ -3,6 +3,7 @@ const ActivityLog = require("../models/ActivityLog");
 const ResultHistory = require("../models/ResultHistory");
 const ALevelStudent = require("../models/ALevelStudent");
 const OLevelStudent = require("../models/OLevelStudent");
+const RegistrationBatch = require("../models/RegistrationBatch");
 const { parseResultFile, parseStudentRegistrationFile } = require("../utils/excelParser");
 const { mergeCourseData, mergeStudentRegistrationData } = require("../services/resultMergeService");
 
@@ -110,6 +111,72 @@ const deleteExamCycle = async (req, res) => {
   }
 };
 
+// @desc   List registration batches uploaded so far
+// @route  GET /api/results/registration-batches?course=
+// @access Protected
+const listRegistrationBatches = async (req, res) => {
+  try {
+    const { course } = req.query;
+    const filter = course ? { course } : {};
+    const batches = await RegistrationBatch.find(filter)
+      .sort({ createdAt: -1 })
+      .populate("uploaded_by", "name email");
+    res.status(200).json({ success: true, batches });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc   Delete a registration batch. Only newly-created students in that
+//         batch are removed (safe). Students that were merely updated by
+//         this batch CANNOT be reverted since their prior values were not
+//         stored — these are reported back but left untouched.
+// @route  DELETE /api/results/registration-batches/:id
+// @access Protected (admin only)
+const deleteRegistrationBatch = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const batch = await RegistrationBatch.findById(id);
+    if (!batch) {
+      return res.status(404).json({ success: false, message: "Registration batch not found" });
+    }
+    if (batch.status === "reverted") {
+      return res.status(400).json({ success: false, message: "This batch has already been reverted" });
+    }
+
+    const Model = getModel(batch.course);
+
+    const deleteResult = await Model.deleteMany({
+      regn_no: { $in: batch.created_regn_nos },
+    });
+
+    batch.status = "reverted";
+    await batch.save();
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      user_name: req.user.name,
+      user_email: req.user.email,
+      role: req.user.role,
+      action: "DELETE",
+      course: batch.course,
+      details: `Reverted registration batch "${batch.batch_name}": removed ${deleteResult.deletedCount} newly-created student(s). ${batch.updated_regn_nos.length} previously-existing student(s) were updated by this batch and could NOT be reverted (no history stored).`,
+      ip_address: req.ip,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Removed ${deleteResult.deletedCount} newly-created student(s) from batch "${batch.batch_name}".`,
+      deletedCount: deleteResult.deletedCount,
+      unrevertedUpdatedCount: batch.updated_regn_nos.length,
+      unrevertedUpdatedRegnNos: batch.updated_regn_nos,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 async function processOneCourse(course, files, cycleNameInput, userId) {
   const studentRegKey = course === "A_LEVEL" ? "a_student_reg" : "o_student_reg";
   const resultKey = course === "A_LEVEL" ? "a_result" : "o_result";
@@ -124,6 +191,18 @@ async function processOneCourse(course, files, cycleNameInput, userId) {
   if (studentRegFile) {
     const regMap = await parseStudentRegistrationFile(studentRegFile.buffer);
     studentRegSummary = await mergeStudentRegistrationData(course, regMap);
+
+    // Record this upload as a batch so it can later be identified / partially rolled back
+    const batchName = cycleNameInput || `${course}_registration_${new Date().toISOString().slice(0, 10)}`;
+    const regBatch = await RegistrationBatch.create({
+      batch_name: batchName,
+      course,
+      uploaded_by: userId,
+      created_regn_nos: studentRegSummary.created_regn_nos,
+      updated_regn_nos: studentRegSummary.updated_regn_nos,
+    });
+    studentRegSummary.batchId = regBatch._id;
+    studentRegSummary.batchName = batchName;
   }
 
   // Process result file
@@ -218,4 +297,9 @@ const uploadResults = async (req, res) => {
   }
 };
 
-module.exports = { uploadResults, deleteExamCycle };
+module.exports = {
+  uploadResults,
+  deleteExamCycle,
+  listRegistrationBatches,
+  deleteRegistrationBatch,
+};

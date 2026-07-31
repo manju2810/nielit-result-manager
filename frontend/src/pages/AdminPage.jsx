@@ -21,6 +21,7 @@ const AdminPage = () => {
   const [tab, setTab] = useState("activity");
   const [logs, setLogs] = useState([]);
   const [cycles, setCycles] = useState([]);
+  const [regBatches, setRegBatches] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,6 +30,24 @@ const AdminPage = () => {
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const fetchCycles = () => {
+    setLoading(true);
+    setError("");
+    API.get("/results/cycles")
+      .then((res) => setCycles(res.data.cycles))
+      .catch((err) => setError(err.response?.data?.message || "Failed to load data"))
+      .finally(() => setLoading(false));
+  };
+
+  const fetchRegBatches = () => {
+    setLoading(true);
+    setError("");
+    API.get("/results/registration-batches")
+      .then((res) => setRegBatches(res.data.batches))
+      .catch((err) => setError(err.response?.data?.message || "Failed to load data"))
+      .finally(() => setLoading(false));
+  };
 
   const fetchUsers = () => {
     setLoading(true);
@@ -48,10 +67,9 @@ const AdminPage = () => {
         .catch((err) => setError(err.response?.data?.message || "Failed to load data"))
         .finally(() => setLoading(false));
     } else if (tab === "cycles") {
-      API.get("/results/cycles")
-        .then((res) => setCycles(res.data.cycles))
-        .catch((err) => setError(err.response?.data?.message || "Failed to load data"))
-        .finally(() => setLoading(false));
+      fetchCycles();
+    } else if (tab === "regbatches") {
+      fetchRegBatches();
     } else if (tab === "users") {
       fetchUsers();
     }
@@ -93,6 +111,43 @@ const AdminPage = () => {
     }
   };
 
+  const handleDeleteCycle = async (cycle) => {
+    if (!window.confirm(`Delete exam cycle "${cycle.cycle_name}"? This will roll back grades for all students in this cycle to their previous best attempt.`)) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await API.delete(`/results/cycles/${cycle._id}`);
+      alert(res.data.message);
+      fetchCycles();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete exam cycle");
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteRegBatch = async (batch) => {
+    const warning = batch.updated_regn_nos.length > 0
+      ? `This will delete ${batch.created_regn_nos.length} newly-created student(s) from "${batch.batch_name}".\n\nNote: ${batch.updated_regn_nos.length} other student(s) were UPDATED (not created) by this batch and cannot be automatically reverted, since their previous values were not stored. Continue?`
+      : `Delete ${batch.created_regn_nos.length} newly-created student(s) from batch "${batch.batch_name}"?`;
+
+    if (!window.confirm(warning)) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      const res = await API.delete(`/results/registration-batches/${batch._id}`);
+      alert(res.data.message + (res.data.unrevertedUpdatedCount > 0
+        ? `\n\n${res.data.unrevertedUpdatedCount} previously-existing student(s) were updated by this batch and were left untouched.`
+        : ""));
+      fetchRegBatches();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete registration batch");
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
@@ -101,7 +156,7 @@ const AdminPage = () => {
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Admin Dashboard</h1>
         <p className="text-gray-500 text-sm mb-6">Audit trail of every upload, view, and login across the system.</p>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button
             onClick={() => setTab("activity")}
             className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "activity" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-300"}`}
@@ -113,6 +168,12 @@ const AdminPage = () => {
             className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "cycles" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-300"}`}
           >
             Exam Cycles
+          </button>
+          <button
+            onClick={() => setTab("regbatches")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "regbatches" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-300"}`}
+          >
+            Registration Batches
           </button>
           <button
             onClick={() => setTab("users")}
@@ -163,11 +224,12 @@ const AdminPage = () => {
                   <th className="px-4 py-3 text-left">Uploaded By</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 text-left">Uploaded At</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
-                {!loading && cycles.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">No exam cycles uploaded yet</td></tr>}
+                {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
+                {!loading && cycles.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No exam cycles uploaded yet</td></tr>}
                 {!loading && cycles.map((c) => (
                   <tr key={c._id} className="border-t border-gray-100">
                     <td className="px-4 py-3 font-medium text-gray-700">{c.cycle_name}</td>
@@ -179,6 +241,69 @@ const AdminPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-500">{new Date(c.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDeleteCycle(c)}
+                        className="text-red-600 hover:text-red-800 text-xs font-semibold border border-red-300 hover:border-red-500 px-3 py-1 rounded-lg transition-colors"
+                      >
+                        🗑 Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {tab === "regbatches" && (
+          <div className="bg-white shadow rounded-2xl overflow-x-auto">
+            <p className="text-xs text-gray-500 px-4 pt-4">
+              Deleting a batch only removes students it newly created. Students it merely updated are listed but left untouched, since their previous values weren't stored.
+            </p>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left">Batch Name</th>
+                  <th className="px-4 py-3 text-left">Course</th>
+                  <th className="px-4 py-3 text-left">Uploaded By</th>
+                  <th className="px-4 py-3 text-left">New / Updated</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Uploaded At</th>
+                  <th className="px-4 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Loading...</td></tr>}
+                {!loading && regBatches.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No registration batches uploaded yet</td></tr>}
+                {!loading && regBatches.map((b) => (
+                  <tr key={b._id} className="border-t border-gray-100">
+                    <td className="px-4 py-3 font-medium text-gray-700">{b.batch_name}</td>
+                    <td className="px-4 py-3">{b.course.replace("_", " ")}</td>
+                    <td className="px-4 py-3">{b.uploaded_by?.name || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-green-700 font-semibold">{b.created_regn_nos.length} new</span>
+                      {" / "}
+                      <span className="text-amber-600 font-semibold">{b.updated_regn_nos.length} updated</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${b.status === "reverted" ? "bg-gray-200 text-gray-500" : "bg-green-100 text-green-700"}`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{new Date(b.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      {b.status === "active" ? (
+                        <button
+                          onClick={() => handleDeleteRegBatch(b)}
+                          className="text-red-600 hover:text-red-800 text-xs font-semibold border border-red-300 hover:border-red-500 px-3 py-1 rounded-lg transition-colors"
+                        >
+                          🗑 Delete
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Already reverted</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
