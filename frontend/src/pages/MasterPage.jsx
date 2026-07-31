@@ -256,8 +256,8 @@ const SpreadsheetView = ({ course, search, batch, onClose }) => {
 const MasterPage = () => {
   const [course, setCourse] = useState("O_LEVEL");
   const [search, setSearch] = useState("");
-  const [batch, setBatch] = useState("");
-  const [batches, setBatches] = useState([]);
+  
+  
   const [students, setStudents] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -268,21 +268,16 @@ const MasterPage = () => {
   const [showSpreadsheet, setShowSpreadsheet] = useState(false);
   const limit = 25;
 
-  useEffect(() => {
-    setBatch("");
-    API.get("/results/batches", { params: { course } })
-      .then((res) => setBatches(res.data.batches))
-      .catch(() => setBatches([]));
-  }, [course]);
+
 
   const fetchStudents = useCallback(() => {
     setLoading(true);
     setError("");
-    API.get("/results/students", { params: { course, search, batch, page, limit } })
+    API.get("/results/students", { params: { course, search,  page, limit } })
       .then((res) => { setStudents(res.data.students); setTotal(res.data.total); })
       .catch((err) => setError(err.response?.data?.message || "Failed to load students"))
       .finally(() => setLoading(false));
-  }, [course, search, batch, page]);
+  }, [course, search, page]);
 
   useEffect(() => {
     const t = setTimeout(fetchStudents, 300);
@@ -293,7 +288,7 @@ const MasterPage = () => {
     setExporting(true);
     try {
       const params = new URLSearchParams({ course });
-      if (batch) params.append("batch", batch);
+     
       if (search) params.append("search", search);
       const res = await API.get(`/results/export?${params.toString()}`, {
         responseType: "blob",
@@ -351,14 +346,7 @@ const MasterPage = () => {
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Batch</label>
-              <select value={batch} onChange={(e) => { setBatch(e.target.value); setPage(1); }}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[160px]">
-                <option value="">All Batches</option>
-                {batches.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
+           
 
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-medium text-gray-600 mb-1">Search (Regn No / Name / Roll No)</label>
@@ -420,7 +408,6 @@ const MasterPage = () => {
         <SpreadsheetView
           course={course}
           search={search}
-          batch={batch}
           onClose={() => setShowSpreadsheet(false)}
         />
       )}
